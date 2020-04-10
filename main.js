@@ -32,8 +32,14 @@ ball.onWallHit = function (wall) {
         this.dy = -this.dy;
     }
     else if (wall === "bottom") {
-        alert("Game over");
-        game.onGameOver();        
+        game.lives--;
+        game.isOn = false;
+        if (game.lives == 0) {
+            game.onGameOver();
+        }       
+        else {
+            game.instantiate();
+        }
     }
 };
 
@@ -64,6 +70,64 @@ let pad = {
     }
 }
 
+class Brick {
+    constructor(x, y, w, h) {
+        this.x = x;
+        this.y = y;
+        this.color = "#4f4f4f";
+        this.width = w;
+        this.height = h;
+        this.isDestroyed = false;
+    };
+    draw() {
+        ctx.beginPath();
+        ctx.rect(this.x, this.y, this.width, this.height);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.closePath();      
+    };
+    onDestroy(i, j) {
+        ball.dy = -ball.dy;
+        ctx.clearRect(this.x, this.y, this.width, this.height);
+        game.bricks[i][j].isDestroyed = true;
+        game.score++;
+        if (game.score == game.maxScore) {
+            game.onWin();
+        }
+    }
+}
+
+function spawnBricks(rows, cols) {
+    let marginX = 50;
+    let marginY = 75;
+    let paddingX = 10;
+    let paddingY = 10;
+    let width = 75;
+    let height = 25;
+    let bricks = new Array(rows);
+    for (let i = 0; i < rows; i++) {
+        bricks[i] = new Array(cols);
+        for (let j = 0; j < cols; j++) {
+            bricks[i][j] = new Brick(
+                marginX + j * (width + paddingX),
+                marginY + i * (height + paddingY),
+                width,
+                height
+                );
+        }
+    }
+    return bricks;
+}
+
+function drawBricks(bricks) {
+    for (let i = 0; i < bricks.length; i++) {
+        for (let j = 0; j < bricks[i].length; j++) {
+            if (!bricks[i][j].isDestroyed) {
+                bricks[i][j].draw();
+            }
+        }
+    }
+}
 
 function checkCollisions() {
     let wall;
@@ -89,17 +153,43 @@ function checkCollisions() {
     {
         ball.onPadHit();
     }
+    for (let i = 0; i < game.bricks.length; i++) {
+        for (let j = 0; j < game.bricks[i].length; j++) {
+            const brick = game.bricks[i][j];
+            if (!brick.isDestroyed
+                && ball.x >= brick.x - ball.radius * COS45 
+                && ball.x <= brick.x + brick.width + ball.radius * COS45
+                && ball.y >= brick.y - ball.radius * COS45
+                && ball.y <= brick.y + brick.height + ball.radius * COS45
+                )
+            {
+                brick.onDestroy(i, j);
+            }
+        }
+    }
 }
+ 
 
 function drawAll() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ball.draw();
     pad.draw();
+    drawBricks(game.bricks);
+    ctx.font = "16px Arial";
+    ctx.fillText(`Score: ${game.score}/${game.maxScore}`, 20, 20);
+    ctx.fillText(`Lives: ${game.lives}`, 640, 20);
+    if (!game.isOn) {
+        ctx.fillText("Press any key to start", 320, 20);
+    }
     requestAnimationFrame(drawAll);
 }
 
 let game = {
     isOn: false,
+    bricks: [],
+    score: 0,
+    lives: 3,
+    maxScore: 24,
     instantiate() {
         pad.x = (canvas.width - pad.width)/2;
         pad.y = canvas.height - pad.height;
@@ -113,19 +203,30 @@ let game = {
         ball.dx = 5;
         ball.dy = -5;
     },
-    
+    setNewGame() {
+        this.instantiate();
+        this.bricks = spawnBricks(3, 8);
+        this.score = 0;
+        this.lives = 3;
+    },
     onGameOver: Function(),
+    onWin: Function(),
 }
 
 game.onGameOver = function() {
     game.isOn = false;
-    this.instantiate();
+    alert("Game over!");
+    this.setNewGame();
+}
+
+game.onWin = function() {
+    game.isOn = false;
+    alert("You won!");
+    this.setNewGame();
 }
 
 document.addEventListener("mousemove", pad.move, false);
 document.addEventListener("keypress", game.start, false);
 requestAnimationFrame(drawAll)
 setInterval(checkCollisions, 50);
-game.instantiate();
-
-
+game.setNewGame();
